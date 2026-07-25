@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from gateway.api.routers import chat, health
 from gateway.api.schemas import ErrorOut
@@ -19,6 +20,10 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Unified chat-completion API across Claude, GPT, Gemini, and Ollama.",
     )
+
+    # Standard request-count/latency histograms at GET /metrics — see
+    # docs/deployment.md's Grafana section for the dashboard that reads them.
+    Instrumentator().instrument(app).expose(app)
 
     app.include_router(health.router)
     app.include_router(chat.router)

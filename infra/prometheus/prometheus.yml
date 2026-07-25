@@ -1,0 +1,70 @@
+# Scrape config for local/dev (docker-compose) — every FastAPI service in
+# the platform exposes GET /metrics via prometheus-fastapi-instrumentator
+# (see each service's api/main.py). Celery workers aren't scraped: they
+# run no HTTP server, so there's nothing to scrape (see docs/deployment.md
+# for what to do about worker-side metrics later).
+#
+# In Kubernetes, replace this with a ServiceMonitor (if using the
+# Prometheus Operator / kube-prometheus-stack) or Prometheus's own
+# `kubernetes_sd_configs` — this static-target file is a docker-compose-only
+# convenience.
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: auth
+    static_configs:
+      - targets: ["auth:8000"]
+
+  - job_name: prompt-registry
+    static_configs:
+      - targets: ["prompt-registry:8000"]
+
+  - job_name: dataset-management
+    static_configs:
+      - targets: ["dataset-management:8000"]
+
+  - job_name: trace-collector
+    static_configs:
+      - targets: ["trace-collector:8000"]
+
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8000"]
+
+  - job_name: evaluation-engine
+    static_configs:
+      - targets: ["evaluation-engine:8000"]
+
+  - job_name: hallucination-detection
+    static_configs:
+      - targets: ["hallucination-detection:8000"]
+
+  - job_name: experiment-tracking
+    static_configs:
+      - targets: ["experiment-tracking:8000"]
+
+  - job_name: cost-analytics
+    static_configs:
+      - targets: ["cost-analytics:8000"]
+
+  - job_name: regression-detection
+    static_configs:
+      - targets: ["regression-detection:8000"]
+
+  - job_name: report-generator
+    static_configs:
+      - targets: ["report-generator:8000"]
+
+  - job_name: notification-service
+    static_configs:
+      - targets: ["notification-service:8000"]
+
+  - job_name: github-integration
+    static_configs:
+      - targets: ["github-integration:8000"]
+
+  - job_name: dashboard-backend
+    static_configs:
+      - targets: ["dashboard-backend:8000"]

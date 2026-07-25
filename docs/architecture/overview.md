@@ -2,7 +2,11 @@
 
 Full v0.1 design was reviewed and approved 2026-07-19. This document is the
 repo-resident reference; ADRs for individual decisions live in
-[`decisions/`](decisions/).
+[`decisions/`](decisions/). All 16 weeks of the development plan below shipped —
+v1.0 — as of 2026-07-25; see [`docs/deployment.md`](../deployment.md) for how to
+run it and [ADR-0007](decisions/0007-prometheus-metrics-and-grafana-dashboards.md)/
+[ADR-0008](decisions/0008-kubernetes-deployment-shared-chart.md) for the final
+week's observability and deployment decisions.
 
 ## Principles
 
@@ -93,7 +97,7 @@ graph TB
 | Cost Analytics | Token/cost ledger, budgets | async | Gateway, Trace Collector |
 | Experiment Tracking | Cross-run comparison/aggregation (see ADR-0005) | sync | Evaluation Engine |
 | Report Generator | HTML/PDF run reports | async | Experiment Tracking |
-| GitHub Integration | Webhooks, check runs, PR comments | sync | Evaluation Engine, Regression Detection |
+| GitHub Integration | Webhooks, check runs, PR comments | sync | Regression Detection |
 | Dashboard Backend | Aggregated view models for the UI | sync | all read-facing services |
 | Notification Service | Slack/email/webhook delivery | async | none |
 

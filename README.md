@@ -13,9 +13,14 @@ replaceable service.
 
 ## Status
 
-Pre-release. Built incrementally, one service per week, per the plan in
-[`docs/architecture/overview.md`](docs/architecture/overview.md). Weeks 1–12
-are done; **Week 13 — GitHub Integration** is next.
+**v1.0.** Built incrementally, one service per week, per the plan in
+[`docs/architecture/overview.md`](docs/architecture/overview.md). All 16 weeks are
+done — see [ADR-0007](docs/architecture/decisions/0007-prometheus-metrics-and-grafana-dashboards.md)
+and [ADR-0008](docs/architecture/decisions/0008-kubernetes-deployment-shared-chart.md)
+for Week 16's observability and Kubernetes-deployment decisions, and
+[`docs/deployment.md`](docs/deployment.md) for what's been verified vs. what a real
+rollout still needs to check for itself (this repo's sandbox has no live cluster or
+Docker daemon to exercise the full stack against).
 
 | Week | Service | Status |
 |---|---|---|
@@ -31,10 +36,10 @@ are done; **Week 13 — GitHub Integration** is next.
 | 10 | Regression Detection Engine | ✅ done |
 | 11 | Report Generator | ✅ done |
 | 12 | Notification Service | ✅ done |
-| 13 | GitHub Integration | ⬜ not started |
-| 14 | Dashboard Backend | ⬜ not started |
-| 15 | React Dashboard | ⬜ not started |
-| 16 | Hardening & v1.0 release | ⬜ not started |
+| 13 | GitHub Integration | ✅ done |
+| 14 | Dashboard Backend | ✅ done |
+| 15 | React Dashboard | ✅ done |
+| 16 | Hardening, Prometheus/Grafana, Helm/k8s, docs, v1.0 | ✅ done |
 
 ## Architecture
 
@@ -59,27 +64,47 @@ Guiding constraints, in short:
 
 ```
 services/     one folder per deployable service (see overview.md for the list)
-libs/         shared kernel: contracts, otel instrumentation, auth client
-frontend/     React dashboard (from Week 15)
-infra/        docker-compose, Kubernetes manifests, Prometheus/Grafana config
-docs/         architecture docs, ADRs, generated OpenAPI specs
+libs/         shared kernel — just auth-client; see the note below
+frontend/     React dashboard (Week 15)
+infra/        docker-compose, Helm/Kubernetes manifests, Prometheus/Grafana config
+docs/         architecture docs, ADRs, deployment guide, generated OpenAPI specs
 ```
+
+`libs/` originally scaffolded `contracts/`, `otel-instrumentation/`, and
+`testing-fixtures/` alongside `auth-client/` — all three stayed empty. OTel
+instrumentation ended up living directly in each service's own
+`infrastructure/observability/` (see ADR-0004), request/response contracts turned
+out to be per-service Pydantic schemas rather than a shared package, and the
+SQLite-repository-test pattern (see ADR-0002) is copy-pasted per service's
+`tests/integration/` rather than shared — each a case of the actual implementation
+finding a better seam than the one guessed at during initial planning. Removed
+rather than left as dead scaffolding.
 
 ## Running locally
 
-Each service is independently runnable; see its own `README.md` under `services/<name>/`
-for setup. A combined `infra/docker-compose.yml` grows as services come online — it
-currently brings up PostgreSQL, Redis, the Authentication Service, Prompt Registry,
-Dataset Management, the Trace Collector, the Gateway, the Evaluation Engine
-(API + Celery worker), Hallucination / Faithfulness Detection, Experiment Tracking,
-Cost & Token Analytics, the Regression Detection Engine, the Report Generator
-(API + Celery worker), and the Notification Service (API + Celery worker).
+See [`docs/deployment.md`](docs/deployment.md) for the full picture (docker-compose
+for local dev, Helm/Kubernetes for a real deployment, Prometheus/Grafana access). In
+short: each service is independently runnable — see its own `README.md` under
+`services/<name>/` for setup — and a combined `infra/docker-compose.yml` brings up
+PostgreSQL, Redis, Prometheus, a pre-provisioned Grafana, the Authentication Service,
+Prompt Registry, Dataset Management, the Trace Collector, the Gateway, the Evaluation
+Engine (API + Celery worker), Hallucination / Faithfulness Detection, Experiment
+Tracking, Cost & Token Analytics, the Regression Detection Engine, the Report
+Generator (API + Celery worker), the Notification Service (API + Celery worker), the
+GitHub Integration service, and the Dashboard Backend.
 
 Gateway, Prompt Registry, Dataset Management, the Evaluation Engine, Hallucination
 Detection, Experiment Tracking, Cost Analytics, Regression Detection, the Report
-Generator, and the Notification Service all depend on the shared `libs/auth-client`
-package. Install it before each service's own dependencies:
-`pip install -e libs/auth-client` — see the affected services' READMEs.
+Generator, the Notification Service, GitHub Integration, and the Dashboard Backend
+all depend on the shared `libs/auth-client` package. Install it before each service's
+own dependencies: `pip install -e libs/auth-client` — see the affected services'
+READMEs.
+
+The React Dashboard (`frontend/`) is a separate Vite dev server, not part of
+`infra/docker-compose.yml` — see `frontend/README.md` for setup. It talks to the Auth
+service, the Report Generator, and the Dashboard Backend directly over HTTP, so those
+three need `*_CORS_ALLOWED_ORIGINS` set to the dashboard's origin (defaults to
+`http://localhost:5173`, already the default in each service's `.env.example`).
 
 ## License
 

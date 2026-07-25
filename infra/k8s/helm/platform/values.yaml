@@ -1,0 +1,190 @@
+# Values for every deployable unit, keyed by the alias declared in
+# Chart.yaml. Each block sets `fullnameOverride` to the same short name
+# docker-compose.yml uses for that service (see infra/docker-compose.yml)
+# — that makes the in-cluster Service DNS name identical to the
+# docker-compose hostname, so every *_URL below is copy-paste identical
+# to its docker-compose counterpart, and every service in this file can
+# reach any other by that same bare name within one namespace.
+#
+# `image.repository` assumes images are built and pushed as
+# `<registry>/arp-<service>` — override `global.imageRegistry` (or each
+# alias's `image.repository`) to match wherever you actually push them.
+# `image.tag` defaults to the chart's appVersion (see Chart.yaml);
+# override per-alias or globally at install time (`--set global.imageTag=...`)
+# once services are versioned independently of the platform release.
+#
+# Nothing sensitive lives here — see values-secrets.example.yaml.
+
+auth:
+  fullnameOverride: auth
+  image:
+    repository: arp-auth
+  migrate:
+    enabled: true
+  env: {}
+
+prompt-registry:
+  fullnameOverride: prompt-registry
+  image:
+    repository: arp-prompt-registry
+  migrate:
+    enabled: true
+  env:
+    PROMPT_REGISTRY_AUTH_SERVICE_URL: http://auth:8000
+
+dataset-management:
+  fullnameOverride: dataset-management
+  image:
+    repository: arp-dataset-management
+  migrate:
+    enabled: true
+  env:
+    DATASET_MGMT_AUTH_SERVICE_URL: http://auth:8000
+
+trace-collector:
+  fullnameOverride: trace-collector
+  image:
+    repository: arp-trace-collector
+  migrate:
+    enabled: true
+  env: {}
+
+gateway:
+  fullnameOverride: gateway
+  image:
+    repository: arp-gateway
+  env:
+    GATEWAY_AUTH_SERVICE_URL: http://auth:8000
+    GATEWAY_TRACE_COLLECTOR_URL: http://trace-collector:8000
+    GATEWAY_COST_ANALYTICS_URL: http://cost-analytics:8000
+
+evaluation-engine:
+  fullnameOverride: evaluation-engine
+  image:
+    repository: arp-evaluation-engine
+  migrate:
+    enabled: true
+  env:
+    EVAL_ENGINE_AUTH_SERVICE_URL: http://auth:8000
+    EVAL_ENGINE_PROMPT_REGISTRY_URL: http://prompt-registry:8000
+    EVAL_ENGINE_DATASET_MGMT_URL: http://dataset-management:8000
+    EVAL_ENGINE_GATEWAY_URL: http://gateway:8000
+    EVAL_ENGINE_HALLUCINATION_SERVICE_URL: http://hallucination-detection:8000
+
+evaluation-engine-worker:
+  fullnameOverride: evaluation-engine-worker
+  image:
+    repository: arp-evaluation-engine
+  service:
+    enabled: false
+  command: ["celery", "-A", "evaluation_engine.infrastructure.worker", "worker", "-Q", "q.evaluation", "--loglevel=info"]
+  env:
+    EVAL_ENGINE_AUTH_SERVICE_URL: http://auth:8000
+    EVAL_ENGINE_PROMPT_REGISTRY_URL: http://prompt-registry:8000
+    EVAL_ENGINE_DATASET_MGMT_URL: http://dataset-management:8000
+    EVAL_ENGINE_GATEWAY_URL: http://gateway:8000
+    EVAL_ENGINE_HALLUCINATION_SERVICE_URL: http://hallucination-detection:8000
+
+hallucination-detection:
+  fullnameOverride: hallucination-detection
+  image:
+    repository: arp-hallucination-detection
+  migrate:
+    enabled: true
+  env:
+    HALLUCINATION_AUTH_SERVICE_URL: http://auth:8000
+    HALLUCINATION_GATEWAY_URL: http://gateway:8000
+
+experiment-tracking:
+  fullnameOverride: experiment-tracking
+  image:
+    repository: arp-experiment-tracking
+  migrate:
+    enabled: true
+  env:
+    EXPERIMENT_TRACKING_AUTH_SERVICE_URL: http://auth:8000
+    EXPERIMENT_TRACKING_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+
+cost-analytics:
+  fullnameOverride: cost-analytics
+  image:
+    repository: arp-cost-analytics
+  migrate:
+    enabled: true
+  env:
+    COST_ANALYTICS_AUTH_SERVICE_URL: http://auth:8000
+
+regression-detection:
+  fullnameOverride: regression-detection
+  image:
+    repository: arp-regression-detection
+  migrate:
+    enabled: true
+  env:
+    REGRESSION_AUTH_SERVICE_URL: http://auth:8000
+    REGRESSION_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+    REGRESSION_TRACE_COLLECTOR_URL: http://trace-collector:8000
+
+report-generator:
+  fullnameOverride: report-generator
+  image:
+    repository: arp-report-generator
+  migrate:
+    enabled: true
+  env:
+    REPORT_GENERATOR_AUTH_SERVICE_URL: http://auth:8000
+    REPORT_GENERATOR_EXPERIMENT_TRACKING_URL: http://experiment-tracking:8000
+
+report-generator-worker:
+  fullnameOverride: report-generator-worker
+  image:
+    repository: arp-report-generator
+  service:
+    enabled: false
+  command: ["celery", "-A", "report_generator.infrastructure.worker", "worker", "-Q", "q.report", "--loglevel=info"]
+  env:
+    REPORT_GENERATOR_AUTH_SERVICE_URL: http://auth:8000
+    REPORT_GENERATOR_EXPERIMENT_TRACKING_URL: http://experiment-tracking:8000
+
+notification-service:
+  fullnameOverride: notification-service
+  image:
+    repository: arp-notification-service
+  migrate:
+    enabled: true
+  env:
+    NOTIFICATION_AUTH_SERVICE_URL: http://auth:8000
+
+notification-service-worker:
+  fullnameOverride: notification-service-worker
+  image:
+    repository: arp-notification-service
+  service:
+    enabled: false
+  command: ["celery", "-A", "notification_service.infrastructure.worker", "worker", "-Q", "q.notification", "--loglevel=info"]
+  env:
+    NOTIFICATION_AUTH_SERVICE_URL: http://auth:8000
+
+github-integration:
+  fullnameOverride: github-integration
+  image:
+    repository: arp-github-integration
+  migrate:
+    enabled: true
+  env:
+    GITHUB_INTEGRATION_AUTH_SERVICE_URL: http://auth:8000
+    GITHUB_INTEGRATION_REGRESSION_DETECTION_URL: http://regression-detection:8000
+
+dashboard-backend:
+  fullnameOverride: dashboard-backend
+  image:
+    repository: arp-dashboard-backend
+  env:
+    DASHBOARD_AUTH_SERVICE_URL: http://auth:8000
+    DASHBOARD_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+    DASHBOARD_COST_ANALYTICS_URL: http://cost-analytics:8000
+    DASHBOARD_REGRESSION_DETECTION_URL: http://regression-detection:8000
+    DASHBOARD_REPORT_GENERATOR_URL: http://report-generator:8000
+    DASHBOARD_NOTIFICATION_SERVICE_URL: http://notification-service:8000
+    DASHBOARD_GITHUB_INTEGRATION_URL: http://github-integration:8000
+    DASHBOARD_TRACE_COLLECTOR_URL: http://trace-collector:8000

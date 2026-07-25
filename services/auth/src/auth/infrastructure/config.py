@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # labeling, both are validated identically today.
     api_key_environment: str = "live"
 
+    # The React Dashboard (Week 15) calls /auth/login and /orgs directly
+    # from the browser — every other service it needs goes through the
+    # Dashboard Backend BFF instead. Vite's default dev port.
+    cors_allowed_origins: list[str] = ["http://localhost:5173"]
+
 
 @lru_cache
 def get_settings() -> Settings:

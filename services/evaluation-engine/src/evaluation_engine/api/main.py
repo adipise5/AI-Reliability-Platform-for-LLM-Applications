@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from evaluation_engine.api.routers import health, runs
 from evaluation_engine.api.schemas import ErrorOut
@@ -20,6 +21,10 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Runs prompt versions against datasets, scores the results, and tracks run status.",
     )
+
+    # Standard request-count/latency histograms at GET /metrics — see
+    # docs/deployment.md's Grafana section for the dashboard that reads them.
+    Instrumentator().instrument(app).expose(app)
 
     app.include_router(health.router)
     app.include_router(runs.router)

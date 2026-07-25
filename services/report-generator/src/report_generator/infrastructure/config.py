@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     experiment_tracking_url: str = "http://experiment-tracking:8000"
     upstream_timeout_seconds: float = 30.0
 
+    # The React Dashboard (Week 15) downloads report content directly from
+    # this service (not proxied through the Dashboard Backend — see that
+    # service's README) — so it, too, needs the dev server's origin.
+    cors_allowed_origins: list[str] = ["http://localhost:5173"]
+
 
 @lru_cache
 def get_settings() -> Settings:

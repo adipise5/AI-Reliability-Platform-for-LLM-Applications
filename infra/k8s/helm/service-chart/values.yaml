@@ -1,0 +1,65 @@
+# Default values for service-chart — see Chart.yaml for what this is.
+# Every field here is overridden per service in ../values/*.yaml.
+
+replicaCount: 1
+
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Overrides the image's default CMD — used for Celery workers, which
+# share their FastAPI sibling's image but run a different process.
+command: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+# Plain (non-secret) environment variables — config URLs, feature flags,
+# tuning knobs. Anything sensitive goes in envSecret instead.
+env: {}
+
+# Environment variables sourced from a Secret this chart creates from
+# these values — DB passwords, JWT secrets, webhook secrets, API tokens.
+# Kept separate from `env` so a values file makes at a glance what's
+# sensitive and what isn't.
+envSecret: {}
+
+# Most units in this platform are a FastAPI app exposing a REST API on
+# one port. Celery workers set this to false — they have no port to
+# expose and no health endpoint to probe.
+service:
+  enabled: true
+  port: 8000
+
+# Every FastAPI service in this platform exposes GET /healthz (see each
+# service's api/routers/health.py) — used for both liveness and
+# readiness, since none of them have separate warm-up work to do.
+healthCheck:
+  enabled: true
+  path: /healthz
+
+# Runs `migrate.command` in an init container sharing the main image,
+# before the main container starts — every service with its own Postgres
+# schema needs this; the Dashboard Backend (no database) and Celery
+# workers (their FastAPI sibling already migrated) leave this disabled.
+migrate:
+  enabled: false
+  command: ["alembic", "upgrade", "head"]
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

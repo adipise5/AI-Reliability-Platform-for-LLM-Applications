@@ -1,0 +1,11 @@
+apiVersion: v2
+name: service-chart
+description: >-
+  Generic chart for one AI Reliability Platform deployable unit — a FastAPI
+  service, or a Celery worker sharing the same image with `service.enabled:
+  false` and a `command` override. Every service in this platform is
+  deployed as one instance of this chart with its own values file — see
+  ../values/*.yaml and ../platform/Chart.yaml.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

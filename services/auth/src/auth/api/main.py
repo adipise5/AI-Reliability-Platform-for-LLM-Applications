@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from auth.api.routers import api_keys, auth, health, orgs
 from auth.api.schemas import ErrorOut
@@ -13,6 +15,7 @@ from auth.domain.errors import (
     InvalidCredentialsError,
     InvalidTokenError,
 )
+from auth.infrastructure.config import get_settings
 
 
 def create_app() -> FastAPI:
@@ -21,6 +24,17 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Orgs, users, API keys, JWTs, and RBAC for the AI Reliability Platform.",
     )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Standard request-count/latency histograms at GET /metrics — see
+    # docs/deployment.md's Grafana section for the dashboard that reads them.
+    Instrumentator().instrument(app).expose(app)
 
     app.include_router(health.router)
     app.include_router(orgs.router)

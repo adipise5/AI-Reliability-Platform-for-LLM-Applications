@@ -9,10 +9,22 @@
 # Every service shares one Postgres instance/database (`arp`) but owns its
 # own schema — see ADR-0002. Gateway, Prompt Registry, Dataset Management,
 # the Evaluation Engine, Hallucination Detection, Experiment Tracking,
-# Cost Analytics, Regression Detection, the Report Generator, and the
-# Notification Service depend on libs/auth-client, so their build context
-# is the repo root, not their own service directory (a
-# services/<name>-scoped context can't reach libs/).
+# Cost Analytics, Regression Detection, the Report Generator, the
+# Notification Service, the GitHub Integration service, and the Dashboard
+# Backend depend on libs/auth-client, so their build context is the repo
+# root, not their own service directory (a services/<name>-scoped
+# context can't reach libs/).
+#
+# The Dashboard Backend is the one service with no database of its own —
+# it has no DATABASE_URL and runs no migration step (see its README).
+#
+# prometheus scrapes every FastAPI service's GET /metrics (see
+# prometheus/prometheus.yml — none of the Celery workers, since they run
+# no HTTP server); grafana is pre-provisioned (see grafana/provisioning/)
+# with a Prometheus data source, a Postgres data source pointed at the
+# same `arp` database, and the two dashboards under grafana/dashboards/.
+# Default login: admin / admin (GF_SECURITY_ADMIN_* below) — change it
+# before exposing this beyond local dev.
 
 services:
   postgres:
@@ -332,6 +344,79 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  github-integration:
+    build:
+      context: ..
+      dockerfile: services/github-integration/Dockerfile
+    ports:
+      - "8012:8000"
+    env_file:
+      - ../services/github-integration/.env
+    environment:
+      GITHUB_INTEGRATION_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      GITHUB_INTEGRATION_AUTH_SERVICE_URL: http://auth:8000
+      GITHUB_INTEGRATION_REGRESSION_DETECTION_URL: http://regression-detection:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      regression-detection:
+        condition: service_started
+    restart: unless-stopped
+
+  dashboard-backend:
+    build:
+      context: ..
+      dockerfile: services/dashboard-backend/Dockerfile
+    ports:
+      - "8013:8000"
+    env_file:
+      - ../services/dashboard-backend/.env
+    environment:
+      DASHBOARD_AUTH_SERVICE_URL: http://auth:8000
+      DASHBOARD_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+      DASHBOARD_COST_ANALYTICS_URL: http://cost-analytics:8000
+      DASHBOARD_REGRESSION_DETECTION_URL: http://regression-detection:8000
+      DASHBOARD_REPORT_GENERATOR_URL: http://report-generator:8000
+      DASHBOARD_NOTIFICATION_SERVICE_URL: http://notification-service:8000
+      DASHBOARD_GITHUB_INTEGRATION_URL: http://github-integration:8000
+      DASHBOARD_TRACE_COLLECTOR_URL: http://trace-collector:8000
+    depends_on:
+      - auth
+      - evaluation-engine
+      - cost-analytics
+      - regression-detection
+      - report-generator
+      - notification-service
+      - github-integration
+      - trace-collector
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - postgres
     restart: unless-stopped
 
 volumes:

@@ -1,0 +1,10 @@
+{{- if .Values.service.enabled }}
+{{ include "service-chart.fullname" . }} is listening on port {{ .Values.service.port }} inside the
+cluster. To reach it from your machine:
+
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "service-chart.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- else }}
+{{ include "service-chart.fullname" . }} is a worker with no exposed port — check its logs with:
+
+  kubectl --namespace {{ .Release.Namespace }} logs -l app.kubernetes.io/instance={{ .Release.Name }} -f
+{{- end }}

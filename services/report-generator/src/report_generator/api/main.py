@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from report_generator.api.routers import health, reports
 from report_generator.api.schemas import ErrorOut
@@ -12,6 +14,7 @@ from report_generator.domain.errors import (
     UnsupportedReportFormatError,
     UpstreamServiceError,
 )
+from report_generator.infrastructure.config import get_settings
 
 
 def create_app() -> FastAPI:
@@ -20,6 +23,17 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Renders HTML/PDF reports summarizing an experiment's runs, generated asynchronously.",
     )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_allowed_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Standard request-count/latency histograms at GET /metrics — see
+    # docs/deployment.md's Grafana section for the dashboard that reads them.
+    Instrumentator().instrument(app).expose(app)
 
     app.include_router(health.router)
     app.include_router(reports.router)

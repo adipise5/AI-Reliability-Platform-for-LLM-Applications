@@ -1,0 +1,87 @@
+apiVersion: v2
+name: ai-reliability-platform
+description: >-
+  Umbrella chart wiring one instance of ../service-chart per deployable unit
+  in the platform (17 total: 14 FastAPI services + 3 Celery workers). Each
+  alias below corresponds 1:1 to a service under services/ in the repo root
+  — see values/<alias>.yaml for its specific image, env, and migrate/command
+  overrides.
+
+  Deliberately does NOT bundle Postgres or Redis as dependencies — see
+  docs/deployment.md for why. Point env.*_DATABASE_URL / *_REDIS_URL at
+  whatever you've provisioned (a managed instance, a separately-installed
+  Bitnami chart, or a dev cluster's own in-cluster Postgres/Redis) via
+  values/*.yaml or a values override at install time.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: auth
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: prompt-registry
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: dataset-management
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: trace-collector
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: gateway
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: evaluation-engine
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: evaluation-engine-worker
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: hallucination-detection
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: experiment-tracking
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: cost-analytics
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: regression-detection
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: report-generator
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: report-generator-worker
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: notification-service
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: notification-service-worker
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: github-integration
+  - name: service-chart
+    version: "0.1.0"
+    repository: "file://../service-chart"
+    alias: dashboard-backend
