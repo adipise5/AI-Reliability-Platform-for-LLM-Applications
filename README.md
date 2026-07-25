@@ -200,38 +200,6 @@ curl -X POST http://localhost:8000/api/v1/chat \
 See [`services/github-integration/README.md`](services/github-integration/README.md)
 for the exact flow.
 
-## Status
-
-Built incrementally, one service per week, per the plan in
-[`docs/architecture/overview.md`](docs/architecture/overview.md). All 16 weeks are
-done — see [ADR-0007](docs/architecture/decisions/0007-prometheus-metrics-and-grafana-dashboards.md)
-and [ADR-0008](docs/architecture/decisions/0008-kubernetes-deployment-shared-chart.md)
-for Week 16's observability and Kubernetes-deployment decisions, and
-[`docs/deployment.md`](docs/deployment.md) for what's been verified vs. what a real
-rollout still needs to check for itself (this repo's sandbox has no live cluster or
-Docker daemon to exercise the full stack against — every service's own test suite has
-been run, ruff/mypy-clean, but the assembled stack hasn't been driven end-to-end in a
-browser against live infrastructure).
-
-| Week | Service | Status |
-|---|---|---|
-| 01 | AI Gateway | ✅ done |
-| 02 | Authentication Service | ✅ done |
-| 03 | Prompt Registry | ✅ done |
-| 04 | Dataset Management | ✅ done |
-| 05 | Trace Collector | ✅ done |
-| 06 | Evaluation Engine | ✅ done |
-| 07 | Hallucination / Faithfulness Detection | ✅ done |
-| 08 | Experiment Tracking | ✅ done |
-| 09 | Cost & Token Analytics | ✅ done |
-| 10 | Regression Detection Engine | ✅ done |
-| 11 | Report Generator | ✅ done |
-| 12 | Notification Service | ✅ done |
-| 13 | GitHub Integration | ✅ done |
-| 14 | Dashboard Backend | ✅ done |
-| 15 | React Dashboard | ✅ done |
-| 16 | Hardening, Prometheus/Grafana, Helm/k8s, docs, v1.0 | ✅ done |
-
 ## Repository layout
 
 ```
