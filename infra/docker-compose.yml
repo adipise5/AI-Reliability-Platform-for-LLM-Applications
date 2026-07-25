@@ -1,0 +1,338 @@
+# AI Reliability Platform — local development
+#
+# Grows one service at a time as each week's milestone lands (see
+# docs/architecture/overview.md). Copy each service's .env.example to .env
+# before running this (`cp services/gateway/.env.example services/gateway/.env`,
+# same for every other services/*) — secrets/API keys come from those files;
+# network-internal values (DB host, other services' URLs) are overridden below.
+#
+# Every service shares one Postgres instance/database (`arp`) but owns its
+# own schema — see ADR-0002. Gateway, Prompt Registry, Dataset Management,
+# the Evaluation Engine, Hallucination Detection, Experiment Tracking,
+# Cost Analytics, Regression Detection, the Report Generator, and the
+# Notification Service depend on libs/auth-client, so their build context
+# is the repo root, not their own service directory (a
+# services/<name>-scoped context can't reach libs/).
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth
+      POSTGRES_DB: arp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d arp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ../services/auth
+    ports:
+      - "8001:8000"
+    env_file:
+      - ../services/auth/.env
+    environment:
+      AUTH_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prompt-registry:
+    build:
+      context: ..
+      dockerfile: services/prompt-registry/Dockerfile
+    ports:
+      - "8002:8000"
+    env_file:
+      - ../services/prompt-registry/.env
+    environment:
+      PROMPT_REGISTRY_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      PROMPT_REGISTRY_AUTH_SERVICE_URL: http://auth:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  dataset-management:
+    build:
+      context: ..
+      dockerfile: services/dataset-management/Dockerfile
+    ports:
+      - "8003:8000"
+    env_file:
+      - ../services/dataset-management/.env
+    environment:
+      DATASET_MGMT_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      DATASET_MGMT_AUTH_SERVICE_URL: http://auth:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  trace-collector:
+    build:
+      context: ../services/trace-collector
+    ports:
+      - "8004:8000"
+    env_file:
+      - ../services/trace-collector/.env
+    environment:
+      TRACE_COLLECTOR_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../services/gateway/.env
+    environment:
+      GATEWAY_AUTH_SERVICE_URL: http://auth:8000
+      GATEWAY_TRACE_COLLECTOR_URL: http://trace-collector:8000
+      GATEWAY_COST_ANALYTICS_URL: http://cost-analytics:8000
+    depends_on:
+      - auth
+      - trace-collector
+      - cost-analytics
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  hallucination-detection:
+    build:
+      context: ..
+      dockerfile: services/hallucination-detection/Dockerfile
+    ports:
+      - "8006:8000"
+    env_file:
+      - ../services/hallucination-detection/.env
+    environment:
+      HALLUCINATION_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      HALLUCINATION_AUTH_SERVICE_URL: http://auth:8000
+      HALLUCINATION_GATEWAY_URL: http://gateway:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  evaluation-engine:
+    build:
+      context: ..
+      dockerfile: services/evaluation-engine/Dockerfile
+    ports:
+      - "8005:8000"
+    env_file:
+      - ../services/evaluation-engine/.env
+    environment:
+      EVAL_ENGINE_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      EVAL_ENGINE_REDIS_URL: redis://redis:6379/0
+      EVAL_ENGINE_AUTH_SERVICE_URL: http://auth:8000
+      EVAL_ENGINE_PROMPT_REGISTRY_URL: http://prompt-registry:8000
+      EVAL_ENGINE_DATASET_MGMT_URL: http://dataset-management:8000
+      EVAL_ENGINE_GATEWAY_URL: http://gateway:8000
+      EVAL_ENGINE_HALLUCINATION_SERVICE_URL: http://hallucination-detection:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  evaluation-engine-worker:
+    build:
+      context: ..
+      dockerfile: services/evaluation-engine/Dockerfile
+    command: celery -A evaluation_engine.infrastructure.worker worker -Q q.evaluation --loglevel=info
+    env_file:
+      - ../services/evaluation-engine/.env
+    environment:
+      EVAL_ENGINE_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      EVAL_ENGINE_REDIS_URL: redis://redis:6379/0
+      EVAL_ENGINE_AUTH_SERVICE_URL: http://auth:8000
+      EVAL_ENGINE_PROMPT_REGISTRY_URL: http://prompt-registry:8000
+      EVAL_ENGINE_DATASET_MGMT_URL: http://dataset-management:8000
+      EVAL_ENGINE_GATEWAY_URL: http://gateway:8000
+      EVAL_ENGINE_HALLUCINATION_SERVICE_URL: http://hallucination-detection:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  experiment-tracking:
+    build:
+      context: ..
+      dockerfile: services/experiment-tracking/Dockerfile
+    ports:
+      - "8007:8000"
+    env_file:
+      - ../services/experiment-tracking/.env
+    environment:
+      EXPERIMENT_TRACKING_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      EXPERIMENT_TRACKING_AUTH_SERVICE_URL: http://auth:8000
+      EXPERIMENT_TRACKING_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  cost-analytics:
+    build:
+      context: ..
+      dockerfile: services/cost-analytics/Dockerfile
+    ports:
+      - "8008:8000"
+    env_file:
+      - ../services/cost-analytics/.env
+    environment:
+      COST_ANALYTICS_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      COST_ANALYTICS_AUTH_SERVICE_URL: http://auth:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  regression-detection:
+    build:
+      context: ..
+      dockerfile: services/regression-detection/Dockerfile
+    ports:
+      - "8009:8000"
+    env_file:
+      - ../services/regression-detection/.env
+    environment:
+      REGRESSION_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      REGRESSION_AUTH_SERVICE_URL: http://auth:8000
+      REGRESSION_EVALUATION_ENGINE_URL: http://evaluation-engine:8000
+      REGRESSION_TRACE_COLLECTOR_URL: http://trace-collector:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      evaluation-engine:
+        condition: service_started
+      trace-collector:
+        condition: service_started
+    restart: unless-stopped
+
+  report-generator:
+    build:
+      context: ..
+      dockerfile: services/report-generator/Dockerfile
+    ports:
+      - "8010:8000"
+    env_file:
+      - ../services/report-generator/.env
+    environment:
+      REPORT_GENERATOR_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      REPORT_GENERATOR_REDIS_URL: redis://redis:6379/0
+      REPORT_GENERATOR_AUTH_SERVICE_URL: http://auth:8000
+      REPORT_GENERATOR_EXPERIMENT_TRACKING_URL: http://experiment-tracking:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      experiment-tracking:
+        condition: service_started
+    restart: unless-stopped
+
+  report-generator-worker:
+    build:
+      context: ..
+      dockerfile: services/report-generator/Dockerfile
+    command: celery -A report_generator.infrastructure.worker worker -Q q.report --loglevel=info
+    env_file:
+      - ../services/report-generator/.env
+    environment:
+      REPORT_GENERATOR_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      REPORT_GENERATOR_REDIS_URL: redis://redis:6379/0
+      REPORT_GENERATOR_AUTH_SERVICE_URL: http://auth:8000
+      REPORT_GENERATOR_EXPERIMENT_TRACKING_URL: http://experiment-tracking:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: services/notification-service/Dockerfile
+    ports:
+      - "8011:8000"
+    env_file:
+      - ../services/notification-service/.env
+    environment:
+      NOTIFICATION_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      NOTIFICATION_REDIS_URL: redis://redis:6379/0
+      NOTIFICATION_AUTH_SERVICE_URL: http://auth:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped
+
+  notification-service-worker:
+    build:
+      context: ..
+      dockerfile: services/notification-service/Dockerfile
+    command: celery -A notification_service.infrastructure.worker worker -Q q.notification --loglevel=info
+    env_file:
+      - ../services/notification-service/.env
+    environment:
+      NOTIFICATION_DATABASE_URL: postgresql+asyncpg://auth:auth@postgres:5432/arp
+      NOTIFICATION_REDIS_URL: redis://redis:6379/0
+      NOTIFICATION_AUTH_SERVICE_URL: http://auth:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
